@@ -1,0 +1,3 @@
+[submodule "detectron2_pinned"]
+	path = detectron2_pinned
+	url = git@github.com:facebookresearch/detectron2.git

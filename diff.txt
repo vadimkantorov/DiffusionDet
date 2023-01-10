@@ -1,0 +1,1103 @@
+Only in .: .gitignore
+Only in ../DiffusionInst/: datasets
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./demo.py ../DiffusionInst/demo.py
+17,19c16,18
+< from diffusiondet.predictor import VisualizationDemo
+< from diffusiondet import DiffusionDetDatasetMapper, add_diffusiondet_config, DiffusionDetWithTTA
+< from diffusiondet.util.model_ema import add_model_ema_configs, may_build_model_ema, may_get_ema_checkpointer, EMAHook, \
+---
+> from diffusioninst.predictor import VisualizationDemo
+> from diffusioninst import DiffusionInstDatasetMapper, add_diffusioninst_config, DiffusionInstWithTTA
+> from diffusioninst.util.model_ema import add_model_ema_configs, may_build_model_ema, may_get_ema_checkpointer, EMAHook, \
+32c31
+<     add_diffusiondet_config(cfg)
+---
+>     add_diffusioninst_config(cfg)
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/__init__.py ../DiffusionInst/diffusiondet/__init__.py
+1,11c1,4
+< # ========================================
+< # Modified by Shoufa Chen
+< # ========================================
+< # Modified by Peize Sun, Rufeng Zhang
+< # Contact: {sunpeize, cxrfzhang}@foxmail.com
+< #
+< # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+< from .config import add_diffusiondet_config
+< from .detector import DiffusionDet
+< from .dataset_mapper import DiffusionDetDatasetMapper
+< from .test_time_augmentation import DiffusionDetWithTTA
+---
+> from .config import add_diffusioninst_config
+> from .detector import DiffusionInst
+> from .dataset_mapper import DiffusionInstDatasetMapper
+> from .test_time_augmentation import DiffusionInstWithTTA
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/dataset_mapper.py ../DiffusionInst/diffusiondet/dataset_mapper.py
+1,7c1,16
+< # ========================================
+< # Modified by Shoufa Chen
+< # ========================================
+< # Modified by Peize Sun, Rufeng Zhang
+< # Contact: {sunpeize, cxrfzhang}@foxmail.com
+< #
+< # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+---
+> """
+> Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+> 
+> Licensed under the Apache License, Version 2.0 (the "License");
+> you may not use this file except in compliance with the License.
+> You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0
+> Unless required by applicable law or agreed to in writing, software
+> distributed under the License is distributed on an "AS IS" BASIS,
+> WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> See the License for the specific language governing permissions and limitations under the License.
+> 
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+> """
+> 
+17c26
+< __all__ = ["DiffusionDetDatasetMapper"]
+---
+> __all__ = ["DiffusionInstDatasetMapper"]
+49c58
+< class DiffusionDetDatasetMapper:
+---
+> class DiffusionInstDatasetMapper:
+52c61
+<     and map it into a format used by DiffusionDet.
+---
+>     and map it into a format used by DiffusionInst.
+114a124
+>             #import pdb;pdb.set_trace()
+116c126
+<                 anno.pop("segmentation", None)
+---
+>                 #anno.pop("segmentation", None)
+125c135
+<             instances = utils.annotations_to_instances(annos, image_shape)
+---
+>             instances = utils.annotations_to_instances(annos, image_shape, mask_format="bitmask")
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/detector.py ../DiffusionInst/diffusiondet/detector.py
+1,7c1,16
+< # ========================================
+< # Modified by Shoufa Chen
+< # ========================================
+< # Modified by Peize Sun, Rufeng Zhang
+< # Contact: {sunpeize, cxrfzhang}@foxmail.com
+< #
+< # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+---
+> """
+> Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+> 
+> Licensed under the Apache License, Version 2.0 (the "License");
+> you may not use this file except in compliance with the License.
+> You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0
+> Unless required by applicable law or agreed to in writing, software
+> distributed under the License is distributed on an "AS IS" BASIS,
+> WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> See the License for the specific language governing permissions and limitations under the License.
+> 
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+> """
+> 
+18c27
+< from detectron2.modeling import META_ARCH_REGISTRY, build_backbone, detector_postprocess
+---
+> from detectron2.modeling import META_ARCH_REGISTRY, build_backbone#, detector_postprocess
+25a35
+> from detectron2.structures.masks import polygons_to_bitmask,BitMasks
+27c37
+< __all__ = ["DiffusionDet"]
+---
+> __all__ = ["DiffusionInst"]
+31a42,194
+> from detectron2.structures import Instances, ROIMasks
+> 
+> 
+> def clip_mask(Boxes,masks):
+>     boxes = Boxes.tensor.long()
+>     assert (len(boxes)==len(masks))
+>     m_out = []
+>     #import pdb;pdb.set_trace()
+>     k = torch.zeros(masks[0].size()).long().to(boxes.device)
+>     for i in range(len(masks)):
+>         #import pdb;pdb.set_trace()
+>         mask = masks[i]
+>         box = boxes[i]
+>         k[box[1]:box[3],box[0]:box[2]] = 1
+>         mask *= k
+>         m_out.append(mask)
+>         k *= 0
+>     return torch.stack(m_out)
+> 
+> 
+> # perhaps should rename to "resize_instance"
+> def detector_postprocess(
+>     results: Instances, output_height: int, output_width: int, mid_size, mask_threshold: float = 0.5
+> ):
+>     """
+>     Resize the output instances.
+>     The input images are often resized when entering an object detector.
+>     As a result, we often need the outputs of the detector in a different
+>     resolution from its inputs.
+>     This function will resize the raw outputs of an R-CNN detector
+>     to produce outputs according to the desired output resolution.
+>     Args:
+>         results (Instances): the raw outputs from the detector.
+>             `results.image_size` contains the input image resolution the detector sees.
+>             This object might be modified in-place.
+>         output_height, output_width: the desired output resolution.
+>     Returns:
+>         Instances: the resized output from the model, based on the output resolution
+>     """
+>     if isinstance(output_width, torch.Tensor):
+>         # This shape might (but not necessarily) be tensors during tracing.
+>         # Converts integer tensors to float temporaries to ensure true
+>         # division is performed when computing scale_x and scale_y.
+>         output_width_tmp = output_width.float()
+>         output_height_tmp = output_height.float()
+>         new_size = torch.stack([output_height, output_width])
+>     else:
+>         new_size = (output_height, output_width)
+>         output_width_tmp = output_width
+>         output_height_tmp = output_height
+> 
+>     scale_x, scale_y = (
+>         output_width_tmp / results.image_size[1],
+>         output_height_tmp / results.image_size[0],
+>     )
+>     results = Instances(new_size, **results.get_fields())
+> 
+>     if results.has("pred_boxes"):
+>         output_boxes = results.pred_boxes
+>     elif results.has("proposal_boxes"):
+>         output_boxes = results.proposal_boxes
+>     else:
+>         output_boxes = None
+>     assert output_boxes is not None, "Predictions must contain boxes!"
+> 
+>     output_boxes.scale(scale_x, scale_y)
+>     #import pdb;pdb.set_trace()
+>     output_boxes.clip(results.image_size)
+>     masks = results.pred_masks
+>     
+>     #masks = F.interpolate(masks.unsqueeze(1), size=new_size, mode='bilinear').squeeze(1)
+>     ################################################
+>     
+>     pred_global_masks = aligned_bilinear(masks.unsqueeze(1), 4)
+>     #import pdb;pdb.set_trace()
+>     pred_global_masks = pred_global_masks[:, :, :mid_size[0], :mid_size[1]]
+>     masks = F.interpolate(
+>                     pred_global_masks,
+>                     size=(new_size[0], new_size[1]),
+>                     mode='bilinear',
+>                     align_corners=False).squeeze(1)
+>     #################################################
+>     masks.gt_(0.5)
+>     #masks = masks.long()
+>     #import pdb;pdb.set_trace()
+>     masks = clip_mask(output_boxes,masks)
+>     #import pdb;pdb.set_trace()
+>     results.pred_masks = masks
+>     results = results[output_boxes.nonempty()]
+>     #import pdb;pdb.set_trace()
+>     #if results.has("pred_masks"):
+>         #if isinstance(results.pred_masks, ROIMasks):
+>         #    roi_masks = results.pred_masks
+>         #else:
+>             # pred_masks is a tensor of shape (N, 1, M, M)
+>         #    roi_masks = ROIMasks(results.pred_masks[:, 0, :, :])
+>         #results.pred_masks = roi_masks.to_bitmasks(
+>         #    results.pred_boxes, output_height, output_width, mask_threshold
+>         #).tensor  # TODO return ROIMasks/BitMask object in the future
+> 
+>     if results.has("pred_keypoints"):
+>         results.pred_keypoints[:, :, 0] *= scale_x
+>         results.pred_keypoints[:, :, 1] *= scale_y
+> 
+>     return results
+> 
+> def aligned_bilinear(tensor, factor):
+>     assert tensor.dim() == 4
+>     assert factor >= 1
+>     assert int(factor) == factor
+>     if factor == 1:
+>         return tensor
+> 
+>     h, w = tensor.size()[2:]
+>     tensor = F.pad(tensor, pad=(0, 1, 0, 1), mode="replicate")
+>     oh = factor * h + 1
+>     ow = factor * w + 1
+>     tensor = F.interpolate(tensor,
+>                            size=(oh, ow),
+>                            mode='bilinear',
+>                            align_corners=True)
+>     tensor = F.pad(tensor,
+>                    pad=(factor // 2, 0, factor // 2, 0),
+>                    mode="replicate")
+>     return tensor[:, :, :oh - 1, :ow - 1]
+> 
+> 
+> def parse_dynamic_params(params, channels, weight_nums, bias_nums):
+>     assert params.dim() == 2
+>     assert len(weight_nums) == len(bias_nums)
+>     assert params.size(1) == sum(weight_nums) + sum(bias_nums)
+>     num_instances = params.size(0)
+>     num_layers = len(weight_nums)
+> 
+>     params_splits = list(
+>         torch.split_with_sizes(params, weight_nums + bias_nums, dim=1))
+> 
+>     weight_splits = params_splits[:num_layers]
+>     bias_splits = params_splits[num_layers:]
+> 
+>     for l in range(num_layers):
+>         if l < num_layers - 1:
+>             # out_channels x in_channels x 1 x 1
+>             weight_splits[l] = weight_splits[l].reshape(
+>                 num_instances * channels, -1, 1, 1)
+>             bias_splits[l] = bias_splits[l].reshape(num_instances * channels)
+>         else:
+>             # out_channels x in_channels x 1 x 1
+>             weight_splits[l] = weight_splits[l].reshape(
+>                 num_instances * 1, -1, 1, 1)
+>             bias_splits[l] = bias_splits[l].reshape(num_instances)
+>     return weight_splits, bias_splits
+> 
+63c226
+< class DiffusionDet(nn.Module):
+---
+> class DiffusionInst(nn.Module):
+65c228
+<     Implement DiffusionDet
+---
+>     Implement DiffusionInst
+74,78c237,242
+<         self.num_classes = cfg.MODEL.DiffusionDet.NUM_CLASSES
+<         self.num_proposals = cfg.MODEL.DiffusionDet.NUM_PROPOSALS
+<         self.hidden_dim = cfg.MODEL.DiffusionDet.HIDDEN_DIM
+<         self.num_heads = cfg.MODEL.DiffusionDet.NUM_HEADS
+< 
+---
+>         self.num_classes = cfg.MODEL.DiffusionInst.NUM_CLASSES
+>         self.num_proposals = cfg.MODEL.DiffusionInst.NUM_PROPOSALS
+>         self.hidden_dim = cfg.MODEL.DiffusionInst.HIDDEN_DIM
+>         self.num_heads = cfg.MODEL.DiffusionInst.NUM_HEADS
+>         self.weight_nums = [64, 64, 8]
+>         self.bias_nums = [8, 8, 1]
+85c249
+<         sampling_timesteps = cfg.MODEL.DiffusionDet.SAMPLE_STEP
+---
+>         sampling_timesteps = cfg.MODEL.DiffusionInst.SAMPLE_STEP
+99c263
+<         self.scale = cfg.MODEL.DiffusionDet.SNR_SCALE
+---
+>         self.scale = cfg.MODEL.DiffusionInst.SNR_SCALE
+133,140c297,304
+<         class_weight = cfg.MODEL.DiffusionDet.CLASS_WEIGHT
+<         giou_weight = cfg.MODEL.DiffusionDet.GIOU_WEIGHT
+<         l1_weight = cfg.MODEL.DiffusionDet.L1_WEIGHT
+<         no_object_weight = cfg.MODEL.DiffusionDet.NO_OBJECT_WEIGHT
+<         self.deep_supervision = cfg.MODEL.DiffusionDet.DEEP_SUPERVISION
+<         self.use_focal = cfg.MODEL.DiffusionDet.USE_FOCAL
+<         self.use_fed_loss = cfg.MODEL.DiffusionDet.USE_FED_LOSS
+<         self.use_nms = cfg.MODEL.DiffusionDet.USE_NMS
+---
+>         class_weight = cfg.MODEL.DiffusionInst.CLASS_WEIGHT
+>         giou_weight = cfg.MODEL.DiffusionInst.GIOU_WEIGHT
+>         l1_weight = cfg.MODEL.DiffusionInst.L1_WEIGHT
+>         no_object_weight = cfg.MODEL.DiffusionInst.NO_OBJECT_WEIGHT
+>         self.deep_supervision = cfg.MODEL.DiffusionInst.DEEP_SUPERVISION
+>         self.use_focal = cfg.MODEL.DiffusionInst.USE_FOCAL
+>         self.use_fed_loss = cfg.MODEL.DiffusionInst.USE_FED_LOSS
+>         self.use_nms = cfg.MODEL.DiffusionInst.USE_NMS
+153c317
+<         losses = ["labels", "boxes"]
+---
+>         losses = ["labels", "boxes", "mask"]
+175c339,340
+<         outputs_class, outputs_coord = self.head(backbone_feats, x_boxes, t, None)
+---
+>         #import pdb;pdb.set_trace()
+>         outputs_class, outputs_coord,outputs_kernel,mask_feat = self.head(backbone_feats, x_boxes, t, None)
+176a342
+>         #torch.Size([6, 1, 500, 80]), torch.Size([6, 1, 500, 153]), torch.Size([1, 8, 200, 304])
+184c350
+<         return ModelPrediction(pred_noise, x_start), outputs_class, outputs_coord
+---
+>         return ModelPrediction(pred_noise, x_start), outputs_class, outputs_coord,outputs_kernel,mask_feat
+191c357
+< 
+---
+>         #import pdb;pdb.set_trace()
+193a360
+>         #tensor([ -1., 999.])
+194a362
+>         
+199c367
+<         ensemble_score, ensemble_label, ensemble_coord = [], [], []
+---
+>         ensemble_score, ensemble_label, ensemble_coord,ensemble_kernel = [], [], [], []
+204,206c372,373
+< 
+<             preds, outputs_class, outputs_coord = self.model_predictions(backbone_feats, images_whwh, img, time_cond,
+<                                                                          self_cond, clip_x_start=clip_denoised)
+---
+>             #import pdb;pdb.set_trace()
+>             preds, outputs_class, outputs_coord,outputs_kernel,mask_feat = self.model_predictions(backbone_feats, images_whwh, img, time_cond,self_cond, clip_x_start=clip_denoised)
+209a377
+>                 #true
+240c408
+<                 box_pred_per_image, scores_per_image, labels_per_image = self.inference(outputs_class[-1],
+---
+>                 box_pred_per_image, scores_per_image, labels_per_image, kernels_per_image = self.inference(outputs_class[-1],
+241a410,411
+>                                                                                         outputs_kernel[-1], 
+>                                                                                         mask_feat,
+245a416
+>                 ensemble_kernel.append(kernels_per_image)
+247a419
+>             #import pdb;pdb.set_trace()
+250a423,424
+>             kernels_per_image = torch.cat(ensemble_kernel, dim=0)
+>             #import pdb;pdb.set_trace()
+255a430,447
+>                 kernels_per_image = kernels_per_image[keep]
+>                 
+>             num_instance = len(kernels_per_image)
+>             weights, biases = parse_dynamic_params(
+>                     kernels_per_image,
+>                     8,
+>                     self.weight_nums,
+>                     self.bias_nums)
+>             #import pdb;pdb.set_trace()
+>             mask_feat_head = mask_feat.repeat(1, num_instance, 1, 1)
+>             mask_logits = self.mask_heads_forward(
+>                     mask_feat_head, 
+>                     weights, 
+>                     biases, 
+>                     num_instance)
+>                 #import pdb;pdb.set_trace()
+>             mask_logits = mask_logits.reshape(-1, 1,mask_feat.size(2), mask_feat.size(3)).squeeze(1).sigmoid()
+>             
+260a453
+>             result.pred_masks = mask_logits
+262a456
+>             #import pdb;pdb.set_trace()
+266c460,461
+<             results = self.inference(box_cls, box_pred, images.image_sizes)
+---
+>             
+>             results = self.inference(box_cls, box_pred, outputs_kernel[-1], mask_feat,images.image_sizes)
+269a465
+>                 #import pdb;pdb.set_trace()
+272c468,469
+<                 r = detector_postprocess(results_per_image, height, width)
+---
+>                 mid_size = image_size
+>                 r = detector_postprocess(results_per_image, height, width,mid_size)
+300a498
+>         #import pdb;pdb.set_trace()
+322,324c520,522
+< 
+<             outputs_class, outputs_coord = self.head(features, x_boxes, t, None)
+<             output = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1]}
+---
+>             #import pdb;pdb.set_trace()
+>             outputs_class, outputs_coord,outputs_kernel,mask_feat = self.head(features, x_boxes, t, None)
+>             output = {'pred_logits': outputs_class[-1], 'pred_boxes': outputs_coord[-1], 'pred_kernels': outputs_kernel[-1], 'mask_feat':mask_feat}
+327,328c525,526
+<                 output['aux_outputs'] = [{'pred_logits': a, 'pred_boxes': b}
+<                                          for a, b in zip(outputs_class[:-1], outputs_coord[:-1])]
+---
+>                  output['aux_outputs'] = [{'pred_logits': a, 'pred_boxes': b, 'pred_kernels':c, 'mask_feat':mask_feat}
+>                                          for a, b, c in zip(outputs_class[:-1], outputs_coord[:-1],outputs_kernel[:-1])]
+413a612
+>             
+418a618,619
+> 
+>             #gt_masks = targets_per_image.gt_masks.tensor 
+422a624,629
+>             if len(targets_per_image) == 0:
+>                 #import pdb;pdb.set_trace()
+>                 bitmask = torch.zeros((h,w))#.to(self.device)
+>             else:
+>                 bitmask = targets_per_image.gt_masks
+>             
+424a632,634
+>             #import pdb;pdb.set_trace()
+>              #BitMasks.from_polygon_masks(targets_per_image.gt_masks,h,w)
+>             target["masks"] = bitmask.to(self.device)
+434c644,664
+<     def inference(self, box_cls, box_pred, image_sizes):
+---
+>     def mask_heads_forward(self, features, weights, biases, num_instances):
+>         '''
+>         :param features
+>         :param weights: [w0, w1, ...]
+>         :param bias: [b0, b1, ...]
+>         :return:
+>         '''
+>         assert features.dim() == 4
+>         n_layers = len(weights)
+>         x = features
+>         for i, (w, b) in enumerate(zip(weights, biases)):
+>             x = F.conv2d(x,
+>                          w,
+>                          bias=b,
+>                          stride=1,
+>                          padding=0,
+>                          groups=num_instances)
+>             if i < n_layers - 1:
+>                 x = F.relu(x)
+>         return x
+>     def inference(self, box_cls, box_pred, kernel, mask_feat, image_sizes):
+442a673,674
+>             [1, 500, 153]
+>             [1, 8, 200, 304]
+454,456c686,688
+< 
+<             for i, (scores_per_image, box_pred_per_image, image_size) in enumerate(zip(
+<                     scores, box_pred, image_sizes
+---
+>             #import pdb;pdb.set_trace()
+>             for i, (scores_per_image, box_pred_per_image, image_size,ker,mas) in enumerate(zip(
+>                     scores, box_pred, image_sizes,kernel, mask_feat
+460a693,695
+>                 ker = ker.view(-1, 1, 153).repeat(1, self.num_classes, 1).view(-1, 153)
+>                 #torch.Size([500, 4])
+>                 
+461a697,698
+>                 #torch.Size([40000, 4])
+>                 ker = ker[topk_indices]
+462a700,701
+>                 #torch.Size([500, 4])
+>                 
+465c704,705
+<                     return box_pred_per_image, scores_per_image, labels_per_image
+---
+>                     #import pdb;pdb.set_trace()
+>                     return box_pred_per_image, scores_per_image, labels_per_image, ker
+471a712
+>                     ker_per_image = ker[keep]
+472a714,730
+>                 num_instance = len(ker_per_image)
+>                 weights, biases = parse_dynamic_params(
+>                     ker_per_image,
+>                     8,
+>                     self.weight_nums,
+>                     self.bias_nums)
+>                 #import pdb;pdb.set_trace()
+>                 mask_feat_head = mas.unsqueeze(0).repeat(1, num_instance, 1, 1)
+>                 mask_logits = self.mask_heads_forward(
+>                     mask_feat_head, 
+>                     weights, 
+>                     biases, 
+>                     num_instance)
+>                 #import pdb;pdb.set_trace()
+>                 mask_logits = mask_logits.reshape(-1, 1, mas.size(1), mas.size(2)).squeeze(1).sigmoid()
+>                 #mask_logits.gt_(0.5)
+>                 #mask_logits = F.interpolate(mask_logits, size=image_size, mode='bilinear').squeeze(1)
+475a734
+>                 result.pred_masks = mask_logits
+478a738
+>             import pdb;pdb.set_trace()
+492a753
+>                 
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/head.py ../DiffusionInst/diffusiondet/head.py
+9c2,17
+< DiffusionDet Transformer class.
+---
+> Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+> 
+> Licensed under the Apache License, Version 2.0 (the "License");
+> you may not use this file except in compliance with the License.
+> You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0
+> Unless required by applicable law or agreed to in writing, software
+> distributed under the License is distributed on an "AS IS" BASIS,
+> WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> See the License for the specific language governing permissions and limitations under the License.
+> 
+> 
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+> 
+> DiffusionInst Transformer class.
+30a39,58
+> def aligned_bilinear(tensor, factor):
+>     assert tensor.dim() == 4
+>     assert factor >= 1
+>     assert int(factor) == factor
+>     if factor == 1:
+>         return tensor
+> 
+>     h, w = tensor.size()[2:]
+>     tensor = F.pad(tensor, pad=(0, 1, 0, 1), mode="replicate")
+>     oh = factor * h + 1
+>     ow = factor * w + 1
+>     tensor = F.interpolate(tensor,
+>                            size=(oh, ow),
+>                            mode='bilinear',
+>                            align_corners=True)
+>     tensor = F.pad(tensor,
+>                    pad=(factor // 2, 0, factor // 2, 0),
+>                    mode="replicate")
+>     return tensor[:, :, :oh - 1, :ow - 1]
+> 
+79c107
+<         
+---
+>         self.stacked_convs = 4
+81,87c109,115
+<         num_classes = cfg.MODEL.DiffusionDet.NUM_CLASSES
+<         d_model = cfg.MODEL.DiffusionDet.HIDDEN_DIM
+<         dim_feedforward = cfg.MODEL.DiffusionDet.DIM_FEEDFORWARD
+<         nhead = cfg.MODEL.DiffusionDet.NHEADS
+<         dropout = cfg.MODEL.DiffusionDet.DROPOUT
+<         activation = cfg.MODEL.DiffusionDet.ACTIVATION
+<         num_heads = cfg.MODEL.DiffusionDet.NUM_HEADS
+---
+>         num_classes = cfg.MODEL.DiffusionInst.NUM_CLASSES
+>         d_model = cfg.MODEL.DiffusionInst.HIDDEN_DIM
+>         dim_feedforward = cfg.MODEL.DiffusionInst.DIM_FEEDFORWARD
+>         nhead = cfg.MODEL.DiffusionInst.NHEADS
+>         dropout = cfg.MODEL.DiffusionInst.DROPOUT
+>         activation = cfg.MODEL.DiffusionInst.ACTIVATION
+>         num_heads = cfg.MODEL.DiffusionInst.NUM_HEADS
+91c119,163
+<         self.return_intermediate = cfg.MODEL.DiffusionDet.DEEP_SUPERVISION
+---
+>         self.return_intermediate = cfg.MODEL.DiffusionInst.DEEP_SUPERVISION
+>         
+>         #inst.
+>         #########################################
+>         # mask branch
+>         
+>         
+>         self.mask_refine = nn.ModuleList()
+>         in_features = ['p3', 'p4', 'p5']
+>         for in_feature in in_features:
+>             conv_block = []
+>             conv_block.append(
+>                 nn.Conv2d(d_model,
+>                           128,
+>                           kernel_size=3,
+>                           stride=1,
+>                           padding=1,
+>                           bias=False))
+>             conv_block.append(nn.BatchNorm2d(128))
+>             conv_block.append(nn.ReLU())
+>             conv_block = nn.Sequential(*conv_block)
+>             self.mask_refine.append(conv_block)
+>         # mask head
+>         tower = []
+>         for i in range(self.stacked_convs):
+>             conv_block = []
+>             conv_block.append(
+>                 nn.Conv2d(128,
+>                           128,
+>                           kernel_size=3,
+>                           stride=1,
+>                           padding=1,
+>                           bias=False))
+>             conv_block.append(nn.BatchNorm2d(128))
+>             conv_block.append(nn.ReLU())
+> 
+>             conv_block = nn.Sequential(*conv_block)
+>             tower.append(conv_block)
+> 
+>         tower.append(
+>             nn.Conv2d(128,
+>                       8,
+>                       kernel_size=1,
+>                       stride=1))
+>         self.mask_head = nn.Sequential(*tower)
+104,105c176,177
+<         self.use_focal = cfg.MODEL.DiffusionDet.USE_FOCAL
+<         self.use_fed_loss = cfg.MODEL.DiffusionDet.USE_FED_LOSS
+---
+>         self.use_focal = cfg.MODEL.DiffusionInst.USE_FOCAL
+>         self.use_fed_loss = cfg.MODEL.DiffusionInst.USE_FED_LOSS
+108c180
+<             prior_prob = cfg.MODEL.DiffusionDet.PRIOR_PROB
+---
+>             prior_prob = cfg.MODEL.DiffusionInst.PRIOR_PROB
+148d219
+<         time = self.time_mlp(t)
+149a221,239
+>         time = self.time_mlp(t)
+>         ############################
+>         for i, (x) in enumerate(features):
+>             if i == 0:
+>                 mask_feat = self.mask_refine[i](x)
+>             elif i <= 2:
+>                 x_p = self.mask_refine[i](x)
+>                 target_h, target_w = mask_feat.size()[2:]
+>                 h, w = x_p.size()[2:]
+>                 assert target_h % h == 0
+>                 assert target_w % w == 0
+>                 factor_h, factor_w = target_h // h, target_w // w
+>                 assert factor_h == factor_w
+>                 x_p = aligned_bilinear(x_p, factor_h)
+>                 mask_feat = mask_feat + x_p
+>         mask_feat = self.mask_head(mask_feat)
+>         ###########################
+>         if len(t)!=len(mask_feat):
+>             import pdb;pdb.set_trace()
+152c242,243
+< 
+---
+>         inter_kernel = []
+>         #import pdb;pdb.set_trace()
+164c255,256
+<             class_logits, pred_bboxes, proposal_features = rcnn_head(features, bboxes, proposal_features, self.box_pooler, time)
+---
+>             #import pdb;pdb.set_trace()
+>             class_logits, pred_bboxes, proposal_features,kernel_pred = rcnn_head(features, bboxes, proposal_features, self.box_pooler, time)
+167a260,262
+>                 inter_kernel.append(kernel_pred)
+>                 
+>                 
+171c266
+<             return torch.stack(inter_class_logits), torch.stack(inter_pred_bboxes)
+---
+>             return torch.stack(inter_class_logits), torch.stack(inter_pred_bboxes),torch.stack(inter_kernel),mask_feat
+173c268
+<         return class_logits[None], pred_bboxes[None]
+---
+>         return class_logits[None], pred_bboxes[None], inter_kernel[None],mask_feat
+191c286
+< 
+---
+>         self.controller = nn.Linear(d_model, 153) #nn.Conv2d(d_model,169,3,padding=1)
+205c300
+<         num_cls = cfg.MODEL.DiffusionDet.NUM_CLS
+---
+>         num_cls = cfg.MODEL.DiffusionInst.NUM_CLS
+214c309
+<         num_reg = cfg.MODEL.DiffusionDet.NUM_REG
+---
+>         num_reg = cfg.MODEL.DiffusionInst.NUM_REG
+221a317,320
+>         
+>         
+>         
+>         #########################################
+223,224c322,323
+<         self.use_focal = cfg.MODEL.DiffusionDet.USE_FOCAL
+<         self.use_fed_loss = cfg.MODEL.DiffusionDet.USE_FED_LOSS
+---
+>         self.use_focal = cfg.MODEL.DiffusionInst.USE_FOCAL
+>         self.use_fed_loss = cfg.MODEL.DiffusionInst.USE_FED_LOSS
+234a334
+>         :features: (torch.Size([2, 256, 208, 208]),xxx,)
+239a340
+>         #import pdb;pdb.set_trace()
+240a342,343
+>         
+>         #import pdb;pdb.set_trace()
+245a349,353
+>         #torch.Size([1000, 256, 7, 7])
+>         #kernel_pred = self.controller(roi_features)
+>         #torch.Size([1000, 169, 7, 7])
+>         #import pdb;pdb.set_trace()
+>         
+249c357,358
+< 
+---
+>         if pro_features.max()>100000:
+>             import pdb;pdb.set_trace()
+250a360,361
+>         # torch.Size([49, 1000, 256])
+>         #kernel_pred = kernel_pred.view(N * nr_boxes, 169, -1).permute(2, 0, 1)
+260a372,373
+>         
+>         
+271a385
+>         #torch.Size([1, 1024]),torch.Size([2, 1024])
+272a387
+>         #torch.Size([500, 512])
+273a389,393
+>         #import pdb;pdb.set_trace()
+>         #if fc_feature.size(0)!=shift.size(0):
+>         #    print (fc_feature.size(),scale.size(),shift.size())
+>         #    import pdb;pdb.set_trace()
+>         
+281a402
+> 
+283a405,406
+>         kernel_pred = self.controller(reg_feature)
+>         #import pdb;pdb.set_trace()
+286c409
+<         return class_logits.view(N, nr_boxes, -1), pred_bboxes.view(N, nr_boxes, -1), obj_features
+---
+>         return class_logits.view(N, nr_boxes, -1), pred_bboxes.view(N, nr_boxes, -1), obj_features, kernel_pred.view(N, nr_boxes, -1)
+334,336c457,459
+<         self.hidden_dim = cfg.MODEL.DiffusionDet.HIDDEN_DIM
+<         self.dim_dynamic = cfg.MODEL.DiffusionDet.DIM_DYNAMIC
+<         self.num_dynamic = cfg.MODEL.DiffusionDet.NUM_DYNAMIC
+---
+>         self.hidden_dim = cfg.MODEL.DiffusionInst.HIDDEN_DIM
+>         self.dim_dynamic = cfg.MODEL.DiffusionInst.DIM_DYNAMIC
+>         self.num_dynamic = cfg.MODEL.DiffusionInst.NUM_DYNAMIC
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/loss.py ../DiffusionInst/diffusiondet/loss.py
+9c2,14
+< DiffusionDet model and criterion classes.
+---
+> Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+> 
+> Licensed under the Apache License, Version 2.0 (the "License");
+> you may not use this file except in compliance with the License.
+> You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0
+> Unless required by applicable law or agreed to in writing, software
+> distributed under the License is distributed on an "AS IS" BASIS,
+> WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> See the License for the specific language governing permissions and limitations under the License.
+> 
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+10a16
+> 
+18a25,55
+> from typing import List, Union
+> import logging
+> from detectron2.data.catalog import MetadataCatalog
+> 
+> 
+> def check_metadata_consistency(key, dataset_names):
+>     """
+>     Check that the datasets have consistent metadata.
+>     Args:
+>         key (str): a metadata key
+>         dataset_names (list[str]): a list of dataset names
+>     Raises:
+>         AttributeError: if the key does not exist in the metadata
+>         ValueError: if the given datasets do not have the same metadata values defined by key
+>     """
+>     if len(dataset_names) == 0:
+>         return
+>     logger = logging.getLogger(__name__)
+>     #import pdb;pdb.set_trace()
+>     entries_per_dataset = [getattr(MetadataCatalog.get(d), key) for d in dataset_names]
+>     for idx, entry in enumerate(entries_per_dataset):
+>         if entry != entries_per_dataset[0]:
+>             logger.error(
+>                 "Metadata '{}' for dataset '{}' is '{}'".format(key, dataset_names[idx], str(entry))
+>             )
+>             logger.error(
+>                 "Metadata '{}' for dataset '{}' is '{}'".format(
+>                     key, dataset_names[0], str(entries_per_dataset[0])
+>                 )
+>             )
+>             raise ValueError("Datasets have different metadata '{}'!".format(key))
+20a58,115
+> 
+> def get_fed_loss_cls_weights(dataset_names: Union[str, List[str]], freq_weight_power=1.0):
+>     """
+>     Get frequency weight for each class sorted by class id.
+>     We now calcualte freqency weight using image_count to the power freq_weight_power.
+>     Args:
+>         dataset_names: list of dataset names
+>         freq_weight_power: power value
+>     """
+>     if isinstance(dataset_names, str):
+>         dataset_names = [dataset_names]
+> 
+>     check_metadata_consistency("class_image_count", dataset_names)
+> 
+>     meta = MetadataCatalog.get(dataset_names[0])
+>     class_freq_meta = meta.class_image_count
+>     class_freq = torch.tensor(
+>         [c["image_count"] for c in sorted(class_freq_meta, key=lambda x: x["id"])]
+>     )
+>     class_freq_weight = class_freq.float() ** freq_weight_power
+>     return class_freq_weight
+> 
+> def dice_coefficient(x, target):
+>     eps = 1e-5
+>     n_instance = x.size(0)
+>     x = x.reshape(n_instance, -1)
+>     target = target.reshape(n_instance, -1)
+>     intersection = (x * target).sum(dim=1)
+>     union = (x ** 2.0).sum(dim=1) + (target ** 2.0).sum(dim=1) + eps
+>     loss = 1. - (2 * intersection / union)
+>     return loss
+> 
+> def parse_dynamic_params(params, channels, weight_nums, bias_nums):
+>     assert params.dim() == 2
+>     assert len(weight_nums) == len(bias_nums)
+>     assert params.size(1) == sum(weight_nums) + sum(bias_nums)
+>     num_instances = params.size(0)
+>     num_layers = len(weight_nums)
+> 
+>     params_splits = list(
+>         torch.split_with_sizes(params, weight_nums + bias_nums, dim=1))
+> 
+>     weight_splits = params_splits[:num_layers]
+>     bias_splits = params_splits[num_layers:]
+> 
+>     for l in range(num_layers):
+>         if l < num_layers - 1:
+>             # out_channels x in_channels x 1 x 1
+>             weight_splits[l] = weight_splits[l].reshape(
+>                 num_instances * channels, -1, 1, 1)
+>             bias_splits[l] = bias_splits[l].reshape(num_instances * channels)
+>         else:
+>             # out_channels x in_channels x 1 x 1
+>             weight_splits[l] = weight_splits[l].reshape(
+>                 num_instances * 1, -1, 1, 1)
+>             bias_splits[l] = bias_splits[l].reshape(num_instances)
+>     return weight_splits, bias_splits
+> 
+22c117
+<     """ This class computes the loss for DiffusionDet.
+---
+>     """ This class computes the loss for DiffusionInst.
+44c139,142
+<         self.use_fed_loss = cfg.MODEL.DiffusionDet.USE_FED_LOSS
+---
+>         self.weight_nums = [64, 64, 8]
+>         self.bias_nums = [8, 8, 1]
+>         
+>         self.use_fed_loss = cfg.MODEL.DiffusionInst.USE_FED_LOSS
+47,48c145,146
+<             from detectron2.data.detection_utils import get_fed_loss_cls_weights
+<             cls_weight_fun = lambda: get_fed_loss_cls_weights(dataset_names=cfg.DATASETS.TRAIN, freq_weight_power=cfg.MODEL.ROI_BOX_HEAD.FED_LOSS_FREQ_WEIGHT_POWER)  # noqa
+---
+>             
+>             cls_weight_fun = lambda: get_fed_loss_cls_weights(dataset_names=cfg.DATASETS.TRAIN, freq_weight_power=0.5)#cfg.MODEL.ROI_BOX_HEAD.FED_LOSS_FREQ_WEIGHT_POWER)  # noqa
+56,57c154,155
+<             self.focal_loss_alpha = cfg.MODEL.DiffusionDet.ALPHA
+<             self.focal_loss_gamma = cfg.MODEL.DiffusionDet.GAMMA
+---
+>             self.focal_loss_alpha = cfg.MODEL.DiffusionInst.ALPHA
+>             self.focal_loss_gamma = cfg.MODEL.DiffusionInst.GAMMA
+91c189
+<     def loss_labels(self, outputs, targets, indices, num_boxes, log=False):
+---
+>     def loss_labels(self, outputs, targets, indices, num_boxes,log=False):
+207a306,386
+>     def mask_heads_forward(self, features, weights, biases, num_instances):
+>         '''
+>         :param features
+>         :param weights: [w0, w1, ...]
+>         :param bias: [b0, b1, ...]
+>         :return:
+>         '''
+>         assert features.dim() == 4
+>         n_layers = len(weights)
+>         x = features
+>         for i, (w, b) in enumerate(zip(weights, biases)):
+>             x = F.conv2d(x,
+>                          w,
+>                          bias=b,
+>                          stride=1,
+>                          padding=0,
+>                          groups=num_instances)
+>             if i < n_layers - 1:
+>                 x = F.relu(x)
+>         return x
+>     
+>     def loss_masks(self, outputs, targets, indices, num_boxes):
+>         assert 'pred_kernels' in outputs
+>         assert 'mask_feat' in outputs
+>         
+>         src_kernels = outputs['pred_kernels']
+>         mask_feats = outputs['mask_feat']
+>         
+>         batch_size = len(targets)
+>         pred_mask_list = []
+> 
+>         tgt_mask_list = []
+>         loss_mask = 0
+>         num_mask = 0
+>         for batch_idx in range(batch_size):
+>             valid_query = indices[batch_idx][0]
+>             gt_multi_idx = indices[batch_idx][1]
+>             if len(gt_multi_idx) == 0:
+>                 continue
+>             mask_feat = mask_feats[batch_idx]
+>             bz_src_kernel = src_kernels[batch_idx]
+>             bz_target_mask = targets[batch_idx]["masks"]
+>             mask_head_params = bz_src_kernel[valid_query]
+>             gt_masks = bz_target_mask[gt_multi_idx].tensor
+>             
+>             if len(mask_head_params)>0:
+>                 num_instance = len(mask_head_params)
+>                 weights, biases = parse_dynamic_params(
+>                     mask_head_params,
+>                     8,
+>                     self.weight_nums,
+>                     self.bias_nums)
+>                 
+>                 mask_feat_head = mask_feat.unsqueeze(0).repeat(1, num_instance, 1, 1)
+>                 mask_logits = self.mask_heads_forward(
+>                     mask_feat_head, 
+>                     weights, 
+>                     biases, 
+>                     num_instance)
+> 
+>                 mask_logits = mask_logits.reshape(-1, 1, mask_feat.size(1), mask_feat.size(2)).squeeze(1)
+> 
+>                 img_h, img_w = mask_feat.size(1) * 4, mask_feat.size(2) * 4
+>                 h, w = gt_masks.size()[1:]
+>                 gt_masks = F.pad(gt_masks, (0, img_w - w, 0, img_h - h), "constant", 0)
+>                 start = int(4 // 2)
+>                 gt_masks = gt_masks[:, start::4, start::4]
+>                 gt_masks = gt_masks.gt(0.5).float()
+>                 
+>                 loss_mask += dice_coefficient(mask_logits.sigmoid(), gt_masks).sum()
+>                 num_mask += len(gt_multi_idx)
+>         
+>         losses = {}
+>         if num_mask>0:
+>             loss_mask = loss_mask / num_mask
+>             losses = {'loss_masks': 5*loss_mask}
+>         else:
+>             losses = {'loss_masks': outputs['pred_boxes'].sum() * 0}
+> 
+>         return losses
+>     
+223a403
+>             'mask': self.loss_masks,
+251c431
+< 
+---
+>         #import pdb;pdb.set_trace()
+289,290c469,470
+<         self.use_fed_loss = cfg.MODEL.DiffusionDet.USE_FED_LOSS
+<         self.ota_k = cfg.MODEL.DiffusionDet.OTA_K
+---
+>         self.use_fed_loss = cfg.MODEL.DiffusionInst.USE_FED_LOSS
+>         self.ota_k = cfg.MODEL.DiffusionInst.OTA_K
+292,293c472,473
+<             self.focal_loss_alpha = cfg.MODEL.DiffusionDet.ALPHA
+<             self.focal_loss_gamma = cfg.MODEL.DiffusionDet.GAMMA
+---
+>             self.focal_loss_alpha = cfg.MODEL.DiffusionInst.ALPHA
+>             self.focal_loss_gamma = cfg.MODEL.DiffusionInst.GAMMA
+348,352d527
+< 
+<                 # Compute the L1 cost between boxes
+<                 # image_size_out = torch.cat([v["image_size_xyxy"].unsqueeze(0) for v in targets])
+<                 # image_size_out = image_size_out.unsqueeze(1).repeat(1, num_queries, 1).flatten(0, 1)
+<                 # image_size_tgt = torch.cat([v["image_size_xyxy_tgt"] for v in targets])
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/swintransformer.py ../DiffusionInst/diffusiondet/swintransformer.py
+1,6c1,6
+< # --------------------------------------------------------
+< # Swin Transformer
+< # Copyright (c) 2021 Microsoft
+< # Licensed under The MIT License [see LICENSE for details]
+< # Written by Ze Liu, Yutong Lin, Yixuan Wei
+< # --------------------------------------------------------
+---
+> """
+> Swin Transformer
+> Copyright (c) 2021 Microsoft
+> Licensed under The MIT License [see LICENSE for details]
+> Written by Ze Liu, Yutong Lin, Yixuan Wei
+> --------------------------------------------------------
+8,9c8,10
+< # Copyright (c) Facebook, Inc. and its affiliates.
+< # Modified by Xingyi Zhou from https://github.com/SwinTransformer/Swin-Transformer-Object-Detection/blob/master/mmdet/models/backbones/swin_transformer.py
+---
+> Copyright (c) Facebook, Inc. and its affiliates.
+> Modified by Xingyi Zhou from https://github.com/SwinTransformer/Swin-Transformer-Object-Detection/blob/master/mmdet/models/backbones/swin_transformer.py
+> """
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./diffusiondet/test_time_augmentation.py ../DiffusionInst/diffusiondet/test_time_augmentation.py
+1,9c1,16
+< # ========================================
+< # Modified by Shoufa Chen
+< # ========================================
+< # Modified by Rufeng Zhang, Peize Sun
+< # Contact: {sunpeize, cxrfzhang}@foxmail.com
+< # 
+< # Copyright (c) Megvii, Inc. and its affiliates. All Rights Reserved
+< # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+< #
+---
+> """
+> Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+> 
+> Licensed under the Apache License, Version 2.0 (the "License");
+> you may not use this file except in compliance with the License.
+> You may obtain a copy of the License at  http://www.apache.org/licenses/LICENSE-2.0
+> Unless required by applicable law or agreed to in writing, software
+> distributed under the License is distributed on an "AS IS" BASIS,
+> WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+> See the License for the specific language governing permissions and limitations under the License.
+> 
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+> """
+> 
+20c27
+< class DiffusionDetWithTTA(GeneralizedRCNNWithTTA):
+---
+> class DiffusionInstWithTTA(GeneralizedRCNNWithTTA):
+22,23c29,30
+<         A DiffusionDet with test-time augmentation enabled.
+<         Its :meth:`__call__` method has the same interface as :meth:`DiffusionDet.forward`.
+---
+>         A DiffusionInst with test-time augmentation enabled.
+>         Its :meth:`__call__` method has the same interface as :meth:`DiffusionInst.forward`.
+30c37
+<                 model (DiffusionDet): a DiffusionDet to apply TTA on.
+---
+>                 model (DiffusionInst): a DiffusionInst to apply TTA on.
+53c60
+<         self.max_detection = cfg.MODEL.DiffusionDet.NUM_PROPOSALS
+---
+>         self.max_detection = cfg.MODEL.DiffusionInst.NUM_PROPOSALS
+60c67
+<         Inputs & outputs have the same format as :meth:`DiffusionDet.forward`
+---
+>         Inputs & outputs have the same format as :meth:`DiffusionInst.forward`
+131c138
+<         num_classes = self.cfg.MODEL.DiffusionDet.NUM_CLASSES
+---
+>         num_classes = self.cfg.MODEL.DiffusionInst.NUM_CLASSES
+Only in ../DiffusionInst/: figure
+Only in .: selsearch
+Only in .: teaser.png
+diff -r -x '*.md' -x '*.yaml' -x LICENSE -x config.py -x .git -x '*.txt' -I '^#' -b ./train_net.py ../DiffusionInst/train_net.py
+9c2,8
+< DiffusionDet Training Script.
+---
+> Modified by Zhangxuan Gu, Haoxing Chen
+> Date: Nov 30, 2022
+> Version: V0
+> Contact: {guzhangxuan.gzx, chenhaoxing.chx}@antgroup.com
+> Copyright (c) Ant Group, Inc. and its affiliates. All Rights Reserved
+> 
+> DiffusionInst Training Script.
+35,36c34,35
+< from diffusiondet import DiffusionDetDatasetMapper, add_diffusiondet_config, DiffusionDetWithTTA
+< from diffusiondet.util.model_ema import add_model_ema_configs, may_build_model_ema, may_get_ema_checkpointer, EMAHook, \
+---
+> from diffusioninst import DiffusionInstDatasetMapper, add_diffusioninst_config, DiffusionInstWithTTA
+> from diffusioninst.util.model_ema import add_model_ema_configs, may_build_model_ema, may_get_ema_checkpointer, EMAHook, \
+41c40
+<     """ Extension of the Trainer class adapted to DiffusionDet. """
+---
+>     """ Extension of the Trainer class adapted to DiffusionInst. """
+117c116
+<         mapper = DiffusionDetDatasetMapper(cfg, is_train=True)
+---
+>         mapper = DiffusionInstDatasetMapper(cfg, is_train=True)
+185c184
+<         model = DiffusionDetWithTTA(cfg, model)
+---
+>         model = DiffusionInstWithTTA(cfg, model)
+254c253
+<     add_diffusiondet_config(cfg)
+---
+>     add_diffusioninst_config(cfg)
